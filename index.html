@@ -328,11 +328,17 @@
                 }
             }, []);
 
-            // 3연강 체크 (공강도 수업과 동일하게 취급되어 3연강 계산에 포함됨)
-            const isConsecutive = (teacher, day, pIdx) => {
-                if (pIdx === -1) return false;
-                const effectiveSchedule = [...teacher.schedule[day]];
-                effectiveSchedule[pIdx] = "임시수업"; 
+            // 3연강 체크 (내어주는 수업은 제외하고 계산하도록 수정됨)
+            const isConsecutive = (teacher, targetDay, targetPeriod, giveUpDay, giveUpPeriod) => {
+                if (targetPeriod === -1) return false;
+                const effectiveSchedule = [...teacher.schedule[targetDay]];
+                
+                // ★ 핵심 수정: 같은 요일의 수업을 교환하는 경우, 내가 내어줄(휴강할) 수업 시간은 비워줍니다.
+                if (targetDay === giveUpDay && giveUpPeriod !== -1) {
+                    effectiveSchedule[giveUpPeriod] = "";
+                }
+                
+                effectiveSchedule[targetPeriod] = "임시수업"; 
 
                 const hasClass = (content) => content && content !== "" && content !== "-";
                 for (let i = 0; i <= 4; i++) {
@@ -386,8 +392,10 @@
 
                             // 여기까지 왔다면 상호 빈 시간 조건은 완벽하게 충족됨. 
                             // 이제 3연강(warning) 발생 여부를 확인하여 순위(Rank) 결정
-                            const warningA = isConsecutive(teacherA, dayB, periodB);
-                            const warningB = isConsecutive(teacherB, selectedDayA, selectedPeriodA);
+                            // warningA: 선생님A가 새로 들어갈 시간(dayB, periodB)에 3연강이 되는가? (기존 수업 selectedDayA, selectedPeriodA 는 내어줌)
+                            const warningA = isConsecutive(teacherA, dayB, periodB, selectedDayA, selectedPeriodA);
+                            // warningB: 선생님B가 새로 들어갈 시간(selectedDayA, selectedPeriodA)에 3연강이 되는가? (기존 수업 dayB, periodB 는 내어줌)
+                            const warningB = isConsecutive(teacherB, selectedDayA, selectedPeriodA, dayB, periodB);
 
                             let rank = 1;
                             if (warningA && warningB) {
