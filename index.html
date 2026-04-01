@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1학년 동일 학급 수업 교체 시스템</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f8fafc; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes slideUpFade {
+            0% { transform: translate(-50%, 100%); opacity: 0; }
+            10% { transform: translate(-50%, 0); opacity: 1; }
+            90% { transform: translate(-50%, 0); opacity: 1; }
+            100% { transform: translate(-50%, 100%); opacity: 0; }
+        }
+        .toast-animate { animation: slideUpFade 3s ease-in-out forwards; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useMemo } from 'https://esm.sh/react@18.2.0';
+        import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+        import {
+            RefreshCw, Search, AlertCircle, X, ChevronRight, Layout, 
+            Award, Database, CheckCircle2, History, ArrowRightLeft, CalendarDays, Trash2, Crosshair, Star
+        } from 'https://esm.sh/lucide-react@0.292.0';
+
+        // ============================================================================
+        // [데이터 설정 영역]
+        // ============================================================================
+        
+        const RAW_DEPT_CSV = `과학,안준범\n과학,최정곤\n과학,아원미\n과학,이지은\n과학,장영화\n과학,허영\n교양,안은수\n교양,임성숙\n교양,구정훈\n교양,추재훈\n교양,이소진\n국어,김용진\n국어,박두일\n국어,송병훈\n국어,김현정\n국어,최승희\n국어,이명진\n사회,권민지\n사회,유지연\n사회,김지수\n사회,최미리\n사회,강슬기\n사회,노우선\n사회,김성년\n수학,김병희\n수학,남송현\n수학,박태완\n수학,옥수민\n수학,고재덕\n수학,유지혜\n영어,이광욱\n영어,김혜미\n영어,이정인\n영어,박은정\n영어,고경미\n영어,정미영\n예술,신선경\n예술,신은경\n예술,유경희\n예술,류제원\n예술,이동규\n예술,김창훈`;
+
+        const RAW_TIME_CSV = `2026학년도 1학기 전체 교사 시간표,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+연번,성명,월,,,,,,,화,,,,,,,수,,,,,,,목,,,,,,,금,,,,,,
+,,1,2,3,4,5,6,7,1,2,3,4,5,6,7,1,2,3,4,5,6,7,1,2,3,4,5,6,7,1,2,3,4,5,6,7
+1,강슬기,,통사,,통사,,통사,사문A,사문D,통사,,,사문B,,,,사문D,,,사문B,,창체,통사,,,사문B,,사문A,,통사,,사문A,,사문D,창체,창체
+,,,1-5,,1-2,,1-6,2-5,2-5,1-4,,,2-5,,,,2-5,,,2-5,,2-7,1-3,,,2-5,,2-5,,1-1,,2-5,,2-5,2-7,2-7
+2,고경미,역량,,,영어,,영어,,영어,,,역량,,영어,영어,,,,영어,,영어,창체,,,영어,영어,,,영어,,영어,영어,,역량,창체,창체
+,,1-6,,,1-4,,1-5,,1-5,,,1-4,,1-6,1-2,,,,1-3,,1-1,1-3,,,1-2,1-4,,,1-1,,1-6,1-3,,1-5,1-3,1-3
+3,고재덕,수학,수학,,수학,,수학,,수학,,수학,,수학,수학,,,,수학,,수학,,창체,,수학,,수학,,수학,,수학,,수학,,수학,,
+,,1-2,1-3,,1-1,,1-4,,1-4,,1-1,,1-5,1-2,,,,1-4,,1-3,,1-4,,1-4,,1-5,,1-2,,1-3,,1-5,,1-1,,
+4,구정훈,,정보,정보,,,심리G,심리B,,심리H,정보,,심리G,,,정보,,,,심리H,,창체,정보,정보,,심리H,,,정보,,정보,,정보,,창체,창체
+,,,2-5,2-6,,,3-3,3-3,,3-3,2-7,,3-3,,,2-5,,,,3-3,,2-2,2-6,2-5,,3-3,,,2-7,,2-7,,2-6,,2-2,2-2
+5,권민지,,윤사C,,,,윤사G,윤사B,윤사B,통사,,,윤사G,,윤사C,윤사G,,,,,윤사B,창체,윤사C,,윤사B,,통사,윤사G,,,,윤사C,통사,,창체,창체
+,,,3-4,,,,3-4,3-4,3-4,1-5,,,3-4,,3-4,3-4,,,,,3-4,3-4,3-4,,3-4,,1-6,3-4,,,,3-4,1-4,,3-4,3-4
+6,김병희,,기하C,,기하A,,,확통B,확통B,,,확통E,,,기하C,,,확통E,기하A,,확통B,창체,기하C,,확통B,,기하A,,확통E,확통E,,기하C,기하A,,창체,창체
+,,,3-6,,3-6,,,3-6,3-6,,,3-6,,,3-6,,,3-6,3-6,,3-6,3-6,3-6,,3-6,,3-6,,3-6,3-6,,3-6,3-6,,3-6,3-6
+7,김성년,,한지C,,,세지C,한지G,,세지D,세지C,,,한지G,,한지C,한지G,세지D,,,,세지C,창체,한지C,공강D,,,,한지G,,,,한지C,,세지D,,
+,,,3-5,,,2-5,3-5,,2-3,2-5,,,3-5,,3-5,3-5,2-3,,,,2-5,3-5,3-5,3-5,,,,3-5,,,,3-5,,2-3,,
+8,김용진,문학,역량,,문학,,역량,,매체D,매체C,,,매체B,,역량,,,문학,문학,,,창체,,,문학,매체B,,매체A,,문학,,매체A,문학,,,
+,,2-3,2-1,,2-4,,2-3,,2-1,2-1,,,2-1,,2-2,,,2-6,2-7,,,2-4,,,2-2,2-1,,2-1,,2-1,,2-1,2-5,,,
+9,김지수,국사1,,국사1,,국사1,,국사1,,국사1,,국사1,,,국사1,국사1,국사1,,,국사1,국사1,,국사1,,국사1,국사1,,국사1,,,국사1,국사1,,국사1,,
+,,1-5,,1-6,,1-2,,1-4,,1-1,,1-6,,,1-3,1-4,1-1,,,1-2,1-5,,1-2,,1-3,1-6,,1-5,,,1-3,1-1,,1-4,,
+10,김창훈,,,,운건A,,운건G,,,운건H,운건F,,운건G,,운건C,,,운건E,운건A,,운건B,창체,운건C,,운건B,운건H,,,,운건E,공강D,,,운건F,창체,창체
+,,,,,3-2,,3-6,,,3-4,3-4,,3-6,,3-3,,,3-4,3-2,,3-2,3-7,3-3,,3-2,3-4,,,,3-4,3-5,,,3-4,3-7,3-7
+11,김현정,,역량,국어,,국어,국어,,역량,,,국어,,,국어,역량,,국어,,국어,,,,,국어,,역량,,국어,,국어,국어,,국어,창체,창체
+,,,1-1,1-3,,1-5,1-2,,1-2,,,1-1,,,1-4,1-3,,1-1,,1-5,,,,,1-6,,2-4,,1-3,,1-2,1-4,,1-6,1-1,1-1
+12,김혜미,,영Ⅰ,영Ⅰ,,영독F,,영독B,영독B,,영독F,영Ⅰ,,영Ⅰ,,영독G,,영Ⅰ,,공강H,,,,영독D,,,영독A,영독G,,영Ⅰ,영독D,,영독A,,,
+,,,2-3,2-4,,3-1,,3-1,3-1,,3-1,2-7,,2-1,,3-1,,2-2,,3-5,,,,3-1,,,3-1,3-1,,2-5,3-1,,3-1,,,
+13,남송현,확통H,,확통D,,확통F,,수학,,확통H,확통F,,수학,확통D,,,확통F,공강E,,확통H,,창체,,확통D,,확통H,,,수학,,확통D,,,확통F,창체,창체
+,,3-2,,3-2,,3-2,,1-6,,3-2,3-2,,1-6,3-2,,,3-2,3-5,,3-2,,3-2,,3-2,,3-2,,,1-6,,3-2,,,3-2,3-2,3-2
+14,노우선,,,통사,,사탐C,,사탐A,,사탐C,통사,,사탐B,,공강C,통사,,통사,,사탐B,사탐C,,,,,사탐B,,사탐A,,,통사,사탐A,,통사,창체,창체
+,,,,1-4,,2-3,,2-3,,2-3,1-2,,2-3,,3-2,1-1,,1-6,,2-3,2-3,,,,,2-3,,2-3,,,1-5,2-3,,1-3,1-5,1-5
+15,류제원,,,체육1,,체육1,,체육1,심리B,,체육1,,공강G,,,체육1,체육1,,,체육1,,창체,,,심리B,체육1,,체육1,체육1,체육1,,,체육1,,창체,창체
+,,,,1-5,,1-4,,1-2,3-3,,1-3,,3-2,,,1-5,1-3,,,1-6,,1-2,,,3-3,1-1,,1-6,1-2,1-4,,,1-1,,1-2,1-2
+16,박두일,국어,,,역량,,,국어,,공강H,,국어,,국어,국어,,국어,국어,,역량,,창체,,국어,국어,,국어,국어,,역량,,,국어,,,
+,,1-4,,,1-5,,,1-1,,3-5,,1-2,,1-5,1-6,,1-6,1-3,,1-4,,1-1,,1-5,1-1,,1-2,1-4,,1-6,,,1-3,,,
+17,박은정,역량,,영Ⅰ,영Ⅰ,,영Ⅰ,,,,영Ⅰ,영Ⅰ,,공강D,영Ⅰ,영Ⅰ,,영Ⅰ,영Ⅰ,,,,영Ⅰ,,영Ⅰ,,영Ⅰ,,영Ⅰ,,영Ⅰ,,영Ⅰ,,,
+,,2-6,,2-2,2-7,,2-5,,,,2-3,2-6,,3-5,2-5,2-4,,2-7,2-6,,,,2-4,,2-1,,2-2,,2-6,,2-1,,2-3,,,
+18,박태완,대수,미적,,대수,공강F,,,,,대수,수학,,미적,,미적,,,수학,,수학,창체,,대수,대수,,미적,,,미적,미적,,대수,,창체,창체
+,,2-7,2-6,,2-6,3-5,,,,,2-6,1-3,,2-7,,2-7,,,1-1,,1-2,3-3,,2-6,2-7,,2-6,,,2-7,2-6,,2-7,,2-4,2-4
+19,송병훈,문학,,고전D,,고전F,문학,,,,고전F,,,고전D,문학,공강G,고전F,,문학,,,창체,문학,고전D,,,문학,,문학,,고전D,,,고전F,창체,창체
+,,2-2,,3-7,,3-7,2-6,,,,3-7,,,3-7,2-7,3-2,3-7,,2-5,,,2-6,2-3,3-7,,,2-1,,2-4,,3-7,,,3-7,2-6,2-6
+20,신선경,,미창,,미창,,,,미술,,공강F,미창,,미창,,,미술,,미술,,미술,창체,,미창,미창,,미술,,미술,,미창,,미창,,창체,창체
+,,,2-4,,2-1,,,,1-6,,3-5,2-3,,2-2,,,1-5,,1-6,,1-4,2-3,,2-1,2-3,,1-5,,1-4,,2-4,,2-2,,2-3,2-3
+21,신은경,음감H,,음연,,음감F,,,,,음연,음감E,,음연,,음감G,음감F,,,음감H,,창체,,음연,음연,,,음감G,음감E,미창,,,공강A,,창체,창체
+,,3-4,,2-7,,3-4,,,,,2-5,3-4,,2-6,,3-6,3-4,,,3-4,,2-5,,2-7,2-5,,,3-6,3-4,2-6,,,3-5,,2-5,2-5
+22,아원미,,,과사D,,생명C,,생명A,생명D,생명C,,,생명B,과사D,,,생명D,,,생명B,생명C,,공강C,과사D,,생명B,,생명A,,,과사D,생명A,,생명D,,
+,,,,3-4,,2-6,,2-6,2-6,2-6,,,2-6,3-4,,,2-6,,,2-6,2-6,,3-2,3-4,,2-6,,2-6,,,3-4,2-6,,2-6,,
+23,안은수,,,,보건,,,,,,,,보건,,,,,,,보건,,창체,,,,보건,보건,,,공강E,,,,보건,,
+,,,,,1-3,,,,,,,,1-1,,,,,,,1-1,,1-5,,,,1-2,1-3,,,3-5,,,,1-2,,
+24,안준범,물ⅡH,,물ⅡD,,물ⅡF,,과역A,,물ⅡH,물ⅡF,,기후B,물ⅡD,,,물ⅡF,,,물ⅡH,,,,물ⅡD,,물ⅡH,,과역A,,,물ⅡD,과역A,,물ⅡF,창체,창체
+,,3-6,,3-6,,3-6,,2-4,,3-6,3-6,,2-4,3-6,,,3-6,,,3-6,,,,3-6,,3-6,,2-4,,,3-6,2-4,,3-6,3-5,3-5
+25,옥수민,대수,대수,,대수,,대수,,,,대수,대수,,대수,대수,대수,,대수,대수,,수학,,대수,대수,,,공강A,,대수,,대수,,,,,
+,,2-4,2-2,,2-5,,2-1,,,,2-2,2-5,,2-4,2-3,2-2,,2-1,2-4,,1-6,,2-1,2-3,,,3-5,,2-5,,2-3,,,,,
+26,유경희,,음감C,,공강A,,음악,음감B,음감B,음악,,,음악,,,심리G,,,음악,,,창체,음악,,,음악,음감A,심리G,,,,음감C,음감A,,창체,창체
+,,,3-3,,3-5,,1-1,3-2,3-2,1-3,,,1-2,,,3-3,,,1-2,,,3-1,1-1,,,1-3,3-2,3-3,,,,3-3,3-2,,3-1,3-1
+27,유지연,공강H,,문제D,,문제F,,문제B,문제B,,문제F,문제E,,문제D,,,문제F,문제E,,,문제B,,,문제D,문제B,,,,문제E,문제E,문제D,,,문제F,,
+,,3-5,,3-3,,3-3,,3-5,3-5,,3-3,3-3,,3-3,,,3-3,3-3,,,3-5,,,3-3,3-5,,,,3-3,3-3,3-3,,,3-3,,
+28,유지혜,미적,,미적,미적,,미적,,,,,미적,,미적,미적,미적,,미적,수학,,,,미적,미적,,,미적,,미적,,미적,,미적,,,
+,,2-1,,2-5,2-3,,2-4,,,,,2-2,,2-5,2-4,2-1,,2-3,1-5,,,,2-2,2-4,,,2-5,,2-3,,2-2,,2-1,,,
+29,이광욱,,영어,영어,,,,역량,,역량,영어,,영어,영어,,영어,영어,,영어,,,,,,영어,,역량,영어,,영어,,,영어,,창체,창체
+,,,1-6,1-1,,,,1-3,,1-2,1-4,,1-3,1-1,,1-6,1-2,,1-4,,,,,,1-5,,1-1,1-3,,1-2,,,1-5,,1-4,1-4
+30,이동규,,,,,운동C,,,운동D,운동C,,,,,,,운동D,,심리A,,운동C,,,,,,심리A,,공강E,,,,심리A,운동D,,
+,,,,,,2-4,,,2-4,2-4,,,,,,,2-4,,3-3,,2-4,,,,,,3-3,,3-5,,,,3-3,2-4,,
+31,이명진,,현대C,,현대A,,,현대B,현대B,,,현대E,,,현대C,,,현대E,현대A,,현대B,,현대C,,현대B,,현대A,,현대E,현대E,,현대C,현대A,,,
+,,,3-7,,3-7,,,3-7,3-7,,,3-7,,,3-7,,,3-7,3-7,,3-7,,3-7,,3-7,,3-7,,3-7,3-7,,3-7,3-7,,,
+32,이소진,심리H,,일어,심리A,,일어,,,,,일어,,일어,일어,일어,공강F,,일어,,심리B,,,일어,일어,,,,일어,일어,,,일어,,창체,창체
+,,3-3,,2-3,3-3,,2-2,,,,,2-4,,2-3,2-1,2-3,3-5,,2-1,,3-3,,,2-2,2-4,,,,2-1,2-2,,,2-4,,3-3,3-3
+33,이정인,,,,,세영C,,세영A,세영D,세영C,,회화E,세영B,,,,세영D,회화E,,세영B,세영C,,,,,세영B,,세영A,회화E,회화E,,세영A,,세영D,,
+,,,,,,2-7,,2-7,2-7,2-7,,3-2,2-7,,,,2-7,3-2,,2-7,2-7,,,,,2-7,,2-7,3-2,3-2,,2-7,,2-7,,
+34,이지은,,생ⅡC,,,통과,,통과,통과,,,생ⅡE,,,생ⅡC,,통과,생ⅡE,,기후B,,,생ⅡC,통과,,기후B,,,생ⅡE,생ⅡE,,생ⅡC,통과,,,
+,,,3-1,,,1-6,,1-5,1-1,,,3-1,,,3-1,,1-4,3-1,,2-4,,,3-1,1-3,,2-4,,,3-1,3-1,,3-1,1-2,,,
+35,임성숙,,,,,,,,,,,,,,,,,,,,,창체,,,,,,,,,,공강C,,,창체,창체
+,,,,,,,,,,,,,,,,,,,,,,2-1,,,,,,,,,,3-2,,,2-1,2-1
+36,장영화,통과,통과,,지ⅡA,,,,,,통과,,통과,통과,,,,통과,지ⅡA,,통과,,통과,통과,,,지ⅡA,통과,,통과,,통과,지ⅡA,,,
+,,1-1,1-4,,3-4,,,,,,1-5,,1-4,1-3,,,,1-2,3-4,,1-3,,1-6,1-2,,,3-4,1-1,,1-5,,1-6,3-4,,,
+37,정미영,,,영독D,영독A,,영독G,,,,역량,,영독G,영독D,,,영독F,,영독A,,영독B,,역량,,영독B,,역량,,역량,역량,역량,,,영독F,,
+,,,,3-1,3-1,,3-1,,,,2-1,,3-1,3-1,,,3-1,,3-1,,3-1,,2-7,,3-1,,2-3,,2-2,2-4,2-5,,,3-1,,
+38,최미리,,국사C,국사D,,통사,통사,,통사,통사,,국사E,,,통사,통사,,통사,국사A,,,,,,통사,국사H,,국사G,,,,통사,,국사F,,
+,,,3-2,3-5,,1-1,1-3,,1-3,1-6,,3-5,,,1-1,1-2,,1-5,3-5,,,,,,1-4,3-5,,3-2,,,,1-2,,3-5,,
+39,최승희,,역량,,,매체C,,,,,문학,문학,,,문학,,,역량,문학,,,,문학,,역량,,문학,,,문학,,,,매체D,,
+,,,2-7,,,2-1,,,,,2-4,2-1,,,2-6,,,2-5,2-2,,,,2-5,,2-6,,2-7,,,2-3,,,,2-1,,
+40,최정곤,과실,과실,,,물리C,,물리A,물리D,물리C,,,물리B,과실,,,물리D,,,물리B,물리C,,,과실,,물리B,,물리A,,,,물리A,,물리D,,
+,,1-3,1-2,,,2-2,,2-2,2-2,2-2,,,2-2,1-4,,,2-2,,,2-2,2-2,,,1-1,,2-2,,2-2,,,,2-2,,2-2,,
+41,추재훈,논술H,,,진직,,공강G,,,논술H,,진직,,,,,,,,논술H,,창체,진직,진직,,논술H,진직,,,,진직,,,,창체,창체
+,,3-1,,,1-6,,3-2,,,3-1,,1-5,,,,,,,,3-1,,1-6,1-5,1-6,,3-1,1-4,,,,1-4,,,,1-6,1-6
+42,허영,화ⅡH,,통과,,통과,화ⅡG,,,화ⅡH,통과,,화ⅡG,,과실,화ⅡG,,,,화ⅡH,,,통과,,,화ⅡH,,화ⅡG,통과,,통과,,과실,,,
+,,3-7,,1-2,,1-3,3-7,,,3-7,1-6,,3-7,,1-5,3-7,,,,3-7,,,1-4,,,3-7,,3-7,1-5,,1-1,,1-6,,,
+43,이정연,,,,,,,매체A,,,,,,,,,매체D,,,매체B,매체C,,,,,,,,,,,,,,,
+,,,,,,,,2-1,,,,,,,,,2-1,,,2-1,2-1,,,,,,,,,,,,,,,
+44,주원석,스포,,스포,스포,,스포,,,,,,,,,스포,,스포,스포,,,,,,,,,,,,,,,,,
+,,2-5,,2-1,2-2,,2-7,,,,,,,,,2-6,,2-4,2-3,,,,,,,,,,,,,,,,,
+`;
+        // ============================================================================
+
+        const getTodayString = () => {
+            const today = new Date();
+            const offset = today.getTimezoneOffset() * 60000;
+            return (new Date(today - offset)).toISOString().split('T')[0];
+        };
+
+        const getTargetDate = (baseDateStr, targetDayStr) => {
+            if (!baseDateStr || !targetDayStr) return "";
+            const dateA = new Date(baseDateStr);
+            const dayIndexA = dateA.getDay(); // 0(일) ~ 6(토)
+            const daysMap = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+            const targetIndex = daysMap[targetDayStr];
+            
+            if (targetIndex === undefined) return "";
+            
+            // 날짜 차이 계산
+            let diff = targetIndex - dayIndexA;
+            
+            // 결강일 기준 이전 날짜가 나오지 않도록 처리 (가장 가까운 미래의 해당 요일)
+            if (diff < 0) {
+                diff += 7; // 과거 요일이면 다음 주로 넘김
+            }
+            
+            const dateB = new Date(dateA);
+            dateB.setDate(dateA.getDate() + diff);
+            
+            // ISO 문자열 반환
+            const offset = dateB.getTimezoneOffset() * 60000;
+            return (new Date(dateB - offset)).toISOString().split('T')[0];
+        };
+
+        const dayMapKor = { mon: '월', tue: '화', wed: '수', thu: '목', fri: '금', sat: '토', sun: '일' };
+
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('swap');
+            const [teachersMaster, setTeachersMaster] = useState([]);
+            const [selectedSemester, setSelectedSemester] = useState("2026-1");
+            
+            const [swapHistory, setSwapHistory] = useState(() => {
+                const saved = localStorage.getItem('classSwapHistory');
+                return saved ? JSON.parse(saved) : [];
+            });
+            
+            const [modalSwap, setModalSwap] = useState(null);
+            const [toastMsg, setToastMsg] = useState(null);
+
+            // [STEP 1] 본인(교체 희망 교사) 설정
+            const [selectedTeacherA, setSelectedTeacherA] = useState("");
+            const [selectedDateA, setSelectedDateA] = useState(getTodayString());
+            const [selectedPeriodA, setSelectedPeriodA] = useState(0);
+
+            // 날짜에서 요일 추출 (STEP 1)
+            const selectedDayA = useMemo(() => {
+                if (!selectedDateA) return "";
+                const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+                return days[new Date(selectedDateA).getDay()];
+            }, [selectedDateA]);
+
+            // 1학년 수업인지 판별 (예: 1-1, 1-5)
+            const isFirstGradeClass = (classInfo) => {
+                if (!classInfo) return false;
+                return classInfo.trim().startsWith("1-");
+            };
+            
+            // 1학년 수업이 있는 교사만 필터링
+            const firstGradeTeachers = useMemo(() => {
+                return teachersMaster.filter(teacher => {
+                    const days = ['mon', 'tue', 'wed', 'thu', 'fri'];
+                    for (let day of days) {
+                        for (let i = 0; i < 7; i++) {
+                            const content = teacher.schedule[day][i];
+                            if (content && content.trim() !== "" && content.trim() !== "-") {
+                                if (isFirstGradeClass(content)) return true;
+                            }
+                        }
+                    }
+                    return false;
+                }).sort((a, b) => a.name.localeCompare(b.name));
+            }, [teachersMaster]);
+
+            // 학급 정보(반)만 추출 (예: "1-1 통사" -> "1-1")
+            const getRoomNumber = (classInfo) => {
+                if (!classInfo) return "";
+                return classInfo.trim().split(' ')[0];
+            };
+
+            const availablePeriodsA = useMemo(() => {
+                if (!selectedTeacherA || teachersMaster.length === 0 || !selectedDayA) return [];
+                const teacherA = teachersMaster.find(t => t.name === selectedTeacherA);
+                if (!teacherA || !teacherA.schedule[selectedDayA]) return [];
+                
+                const periods = [];
+                for (let i = 0; i < 7; i++) {
+                    const content = teacherA.schedule[selectedDayA][i];
+                    if (content && content.trim() !== "" && content.trim() !== "-") {
+                        if (isFirstGradeClass(content)) {
+                            periods.push(i);
+                        }
+                    }
+                }
+                return periods;
+            }, [selectedTeacherA, selectedDayA, teachersMaster]);
+
+            useEffect(() => {
+                if (selectedTeacherA) {
+                    if (availablePeriodsA.length > 0) {
+                        setSelectedPeriodA((prev) => availablePeriodsA.includes(prev) ? prev : availablePeriodsA[0]);
+                    } else {
+                        setSelectedPeriodA(-1);
+                    }
+                }
+            }, [availablePeriodsA, selectedTeacherA]);
+
+            const showToast = (msg) => {
+                setToastMsg(msg);
+                setTimeout(() => setToastMsg(null), 3000);
+            };
+
+            useEffect(() => {
+                localStorage.setItem('classSwapHistory', JSON.stringify(swapHistory));
+            }, [swapHistory]);
+
+            const parseCSVLine = (text) => {
+                const result = [];
+                let current = '';
+                let inQuotes = false;
+                for (let i = 0; i < text.length; i++) {
+                    const c = text[i];
+                    if (c === '"') { inQuotes = !inQuotes; } 
+                    else if (c === ',' && !inQuotes) { result.push(current); current = ''; } 
+                    else { current += c; }
+                }
+                result.push(current);
+                return result.map(s => s.trim());
+            };
+
+            useEffect(() => {
+                try {
+                    const teachersObj = {};
+                    const deptMap = new Map();
+
+                    RAW_DEPT_CSV.replace(/^\uFEFF/, '').split(/\r?\n/).forEach(line => {
+                        if (line.trim() === "") return;
+                        const parts = parseCSVLine(line);
+                        if (parts.length >= 2) {
+                            deptMap.set(parts[1], parts[0]);
+                            teachersObj[parts[1]] = {
+                                id: parts[1], name: parts[1], dept: parts[0],
+                                schedule: { mon: ["", "", "", "", "", "", ""], tue: ["", "", "", "", "", "", ""], wed: ["", "", "", "", "", "", ""], thu: ["", "", "", "", "", "", ""], fri: ["", "", "", "", "", "", ""] }
+                            };
+                        }
+                    });
+
+                    const rows = RAW_TIME_CSV.replace(/^\uFEFF/, '').replace(/"/g, '').split(/\r?\n/).map(r => parseCSVLine(r));
+                    let startRow = 3;
+                    for (let i = 0; i < rows.length; i++) {
+                        if (rows[i] && rows[i][0] === "1" && rows[i][1]) { startRow = i; break; }
+                    }
+
+                    for (let i = startRow; i < rows.length - 1; i += 2) {
+                        const subjectRow = rows[i];
+                        const classRow = rows[i + 1];
+                        if (!subjectRow || subjectRow.length < 2) continue;
+                        const rawName = subjectRow[1] ? subjectRow[1].trim() : "";
+                        if (!rawName || rawName === "성명") continue;
+
+                        const nameMatch = rawName.match(/^[가-힣]+/);
+                        const tName = nameMatch ? nameMatch[0] : rawName.split(/[\s\(\-]/)[0];
+
+                        if (tName && tName.length >= 2) {
+                            if (!teachersObj[tName]) {
+                                teachersObj[tName] = {
+                                    id: tName, name: tName, dept: deptMap.get(tName) || '미분류',
+                                    schedule: { mon: Array(7).fill(""), tue: Array(7).fill(""), wed: Array(7).fill(""), thu: Array(7).fill(""), fri: Array(7).fill("") }
+                                };
+                            }
+                            const days = ['mon', 'tue', 'wed', 'thu', 'fri'];
+                            let colIdx = 2; 
+                            for (let d = 0; d < 5; d++) {
+                                for (let p = 0; p < 7; p++) {
+                                    const subject = subjectRow[colIdx] ? subjectRow[colIdx].trim() : "";
+                                    const className = classRow && classRow[colIdx] ? classRow[colIdx].trim() : "";
+                                    if (subject && subject !== "-") {
+                                        teachersObj[tName].schedule[days[d]][p] = className ? `${className} ${subject}`.trim() : subject;
+                                    }
+                                    colIdx++;
+                                }
+                            }
+                        }
+                    }
+                    setTeachersMaster(Object.values(teachersObj));
+                } catch (error) {
+                    console.error("CSV 파싱 오류:", error);
+                    showToast("데이터 형식 오류가 발생했습니다.");
+                }
+            }, []);
+
+            // 3연강 체크 (공강도 수업과 동일하게 취급되어 3연강 계산에 포함됨)
+            const isConsecutive = (teacher, day, pIdx) => {
+                if (pIdx === -1) return false;
+                const effectiveSchedule = [...teacher.schedule[day]];
+                effectiveSchedule[pIdx] = "임시수업"; 
+
+                const hasClass = (content) => content && content !== "" && content !== "-";
+                for (let i = 0; i <= 4; i++) {
+                    if (hasClass(effectiveSchedule[i]) && hasClass(effectiveSchedule[i+1]) && hasClass(effectiveSchedule[i+2])) {
+                        return true;
+                    }
+                }
+                return false; 
+            };
+
+            // --- STEP 2: 가능한 모든 시간 전수 탐색 및 순위 산출 엔진 ---
+            const swapCandidates = useMemo(() => {
+                if (!selectedTeacherA || selectedPeriodA === -1 || !selectedDayA || teachersMaster.length === 0) return [];
+                
+                const teacherA = teachersMaster.find(t => t.name === selectedTeacherA);
+                const classA = teacherA.schedule[selectedDayA][selectedPeriodA];
+
+                if (!isFirstGradeClass(classA)) return [];
+
+                const targetRoom = getRoomNumber(classA);
+                let candidates = [];
+                const days = ['mon', 'tue', 'wed', 'thu', 'fri'];
+
+                days.forEach(dayB => {
+                    for (let periodB = 0; periodB < 7; periodB++) {
+                        // [규칙 1] 수요일 7교시, 금요일 6, 7교시는 절대 교환 불가
+                        if (dayB === 'wed' && periodB === 6) continue;
+                        if (dayB === 'fri' && (periodB === 5 || periodB === 6)) continue;
+                        
+                        // [규칙 2] 동일 요일, 동일 시간은 의미 없음
+                        if (selectedDayA === dayB && selectedPeriodA === periodB) continue;
+
+                        // [규칙 3] 파트너가 들어갈 내 원래 시간(B)에 나(A)는 반드시 비어있어야 함 (내 빈 시간이어야 함)
+                        // (공강감독 등 어떠한 내용이라도 들어있으면 바쁜 시간으로 취급)
+                        const classA_at_TimeB = teacherA.schedule[dayB][periodB];
+                        if (classA_at_TimeB && classA_at_TimeB !== "-") continue;
+
+                        // 이제 이 시간(dayB, periodB)에 targetRoom(예: 1-1)을 들어가는 선생님(B)을 찾음
+                        teachersMaster.forEach(teacherB => {
+                            if (teacherB.name === teacherA.name) return; // 본인 제외
+
+                            const classB = teacherB.schedule[dayB][periodB];
+                            
+                            // [규칙 4] B 선생님이 이 시간에 정확히 동일 학급을 가르쳐야 함
+                            if (!classB || getRoomNumber(classB) !== targetRoom) return;
+
+                            // [규칙 5] 내 결강 시간(A)에 B 선생님은 반드시 비어있어야 함
+                            // (공강감독 등 어떠한 내용이라도 들어있으면 바쁜 시간으로 취급)
+                            const classB_at_TimeA = teacherB.schedule[selectedDayA][selectedPeriodA];
+                            if (classB_at_TimeA && classB_at_TimeA !== "-") return;
+
+                            // 여기까지 왔다면 상호 빈 시간 조건은 완벽하게 충족됨. 
+                            // 이제 3연강(warning) 발생 여부를 확인하여 순위(Rank) 결정
+                            const warningA = isConsecutive(teacherA, dayB, periodB);
+                            const warningB = isConsecutive(teacherB, selectedDayA, selectedPeriodA);
+
+                            let rank = 1;
+                            if (warningA && warningB) {
+                                rank = 3; // 둘 다 3연강
+                            } else if (warningA || warningB) {
+                                rank = 2; // 어느 한쪽만 3연강
+                            }
+
+                            candidates.push({
+                                teacherB: teacherB,
+                                dayB: dayB,
+                                periodB: periodB,
+                                classB: classB,
+                                warningA: warningA,
+                                warningB: warningB,
+                                rank: rank,
+                                isSameDay: selectedDayA === dayB ? 1 : 0
+                            });
+                        });
+                    }
+                });
+
+                // 정렬 로직: 1. 순위 오름차순 (1순위가 먼저) -> 2. 당일 교체 우선 -> 3. 이름순
+                return candidates.sort((a, b) => 
+                    a.rank - b.rank || 
+                    b.isSameDay - a.isSameDay || 
+                    a.teacherB.name.localeCompare(b.teacherB.name)
+                );
+            }, [selectedTeacherA, selectedDayA, selectedPeriodA, teachersMaster]);
+
+            const currentClassA = useMemo(() => {
+                if(!selectedTeacherA || selectedPeriodA === -1) return null;
+                const t = teachersMaster.find(t => t.name === selectedTeacherA);
+                return t ? t.schedule[selectedDayA]?.[selectedPeriodA] : null;
+            }, [selectedTeacherA, selectedDayA, selectedPeriodA, teachersMaster]);
+
+            const existingSwap = useMemo(() => {
+                if (!selectedTeacherA || selectedPeriodA === -1 || !selectedDateA) return null;
+                return swapHistory.find(h =>
+                    h.semester === selectedSemester &&
+                    h.teacherA === selectedTeacherA &&
+                    h.dateA === selectedDateA &&
+                    h.periodA === selectedPeriodA + 1
+                );
+            }, [swapHistory, selectedSemester, selectedTeacherA, selectedDateA, selectedPeriodA]);
+
+            const handleConfirmSwap = () => {
+                const newRecord = {
+                    id: Date.now().toString(),
+                    semester: selectedSemester,
+                    timestamp: new Date().toLocaleString('ko-KR'),
+                    teacherA: selectedTeacherA,
+                    dateA: selectedDateA,
+                    dayA: selectedDayA,
+                    periodA: selectedPeriodA + 1,
+                    classA: currentClassA,
+                    teacherB: modalSwap.teacherB.name,
+                    dateB: modalSwap.targetDateB, 
+                    dayB: modalSwap.dayB,
+                    periodB: modalSwap.periodB + 1,
+                    classB: modalSwap.classB
+                };
+
+                setSwapHistory([newRecord, ...swapHistory]);
+                setModalSwap(null);
+                showToast(`성공적으로 동일 학급 수업 맞교체가 확정되었습니다.`);
+            };
+
+            const handleDeleteRecord = (id) => {
+                if(window.confirm("이 교체 기록을 취소/삭제하시겠습니까?")) {
+                    setSwapHistory(prev => prev.filter(r => r.id !== id));
+                    showToast("기록이 삭제되었습니다.");
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-50 text-slate-800 pb-20 md:pb-0 font-sans selection:bg-indigo-100 selection:text-indigo-900">
+                    
+                    <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-4 sticky top-0 z-30 flex items-center justify-between md:hidden shadow-sm">
+                        <h1 className="font-black text-lg text-indigo-600 flex items-center gap-2">
+                            <RefreshCw size={18} /> Class Swap
+                        </h1>
+                        <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded font-bold">1학년 도우미</span>
+                    </header>
+
+                    <div className="flex flex-col md:flex-row min-h-screen">
+                        {/* Sidebar */}
+                        <aside className="w-64 bg-slate-900 text-white p-6 hidden md:flex flex-col sticky top-0 h-screen shadow-xl z-20">
+                            <div className="mb-10">
+                                <h2 className="text-xl font-black flex items-center gap-3">
+                                    <div className="bg-indigo-600 p-2 rounded-xl"><RefreshCw size={20}/></div>
+                                    수업 교체 도우미
+                                </h2>
+                                <p className="text-[11px] text-indigo-300 font-bold mt-2 tracking-widest uppercase">1st Grade Swap Helper</p>
+                            </div>
+                            
+                            <nav className="space-y-2 flex-1">
+                                {[
+                                    { id: 'swap', label: '수업 맞교환 찾기', icon: <Search size={18}/> },
+                                    { id: 'history', label: '교환 내역 조회', icon: <History size={18}/> }
+                                ].map(item => (
+                                    <button 
+                                        key={item.id}
+                                        onClick={() => setActiveTab(item.id)}
+                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === item.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30 translate-x-1' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+                                    >
+                                        {item.icon} {item.label}
+                                    </button>
+                                ))}
+                            </nav>
+                            
+                            <div className="pt-4 border-t border-slate-800 mt-auto">
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2">도우미 작동 규칙</p>
+                                <ul className="text-[11px] text-slate-400 space-y-1.5 opacity-90">
+                                    <li className="flex gap-2"><span className="text-indigo-400">✓</span> <div><b className="text-slate-200">자동 전수 조사</b> (가능한 모든 시간 탐색)</div></li>
+                                    <li className="flex gap-2"><span className="text-indigo-400">✓</span> <div><b className="text-slate-200">동일 학급 한정</b> (예: 1-1반 ↔ 1-1반)</div></li>
+                                    <li className="flex gap-2"><span className="text-indigo-400">✓</span> <div><b className="text-slate-200">상호 빈 시간</b> 1:1 완벽 체크<br/><span className="text-[9px] text-slate-400">(공강감독 시간은 교체 불가)</span></div></li>
+                                    <li className="flex gap-2"><span className="text-rose-400">✗</span> <div><b className="text-slate-200">수7, 금6·7교시</b> 배정 절대 금지</div></li>
+                                </ul>
+                            </div>
+                        </aside>
+
+                        {/* Main Content */}
+                        <main className="flex-1 w-full max-w-4xl mx-auto p-4 md:px-8 md:py-6">
+                            
+                            {activeTab === 'swap' && (
+                                <div className="space-y-4 md:space-y-6 animate-in fade-in duration-500">
+                                    <div className="hidden md:block">
+                                        <h2 className="text-2xl font-black text-slate-800 tracking-tight">1학년 수업 교체 도우미</h2>
+                                        <p className="text-slate-500 mt-1 text-sm font-medium">결강할 수업 하나만 선택하시면, 상호 교체가 가능한 모든 파트너와 시간 조합을 1~3순위로 자동 분석해 드립니다.</p>
+                                    </div>
+
+                                    {/* STEP 1 */}
+                                    <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 bg-indigo-50 text-indigo-600 px-4 py-1.5 font-black text-[10px] rounded-bl-xl tracking-wider">STEP 1. 바꿀 내 수업 (휴강 예정)</div>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">결강 교사</label>
+                                                <select className="w-full p-3 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold" value={selectedTeacherA} onChange={e => setSelectedTeacherA(e.target.value)}>
+                                                    <option value="">선생님 성함 선택</option>
+                                                    {firstGradeTeachers.map(t => <option key={t.id} value={t.name}>[{t.dept}] {t.name}</option>)}
+                                                </select>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3 md:col-span-2">
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">결강 일자 (달력)</label>
+                                                    <input 
+                                                        type="date"
+                                                        className="w-full p-3 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-700"
+                                                        value={selectedDateA}
+                                                        onChange={e => setSelectedDateA(e.target.value)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">불가 교시 <span className="text-indigo-500 font-black">({dayMapKor[selectedDayA] || '-'}요일)</span></label>
+                                                    <select className="w-full p-3 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" value={selectedPeriodA} onChange={e => setSelectedPeriodA(parseInt(e.target.value))} disabled={!selectedTeacherA || availablePeriodsA.length === 0}>
+                                                        {!selectedTeacherA ? <option value="-1">대기중</option> : 
+                                                         availablePeriodsA.length === 0 ? <option value="-1">해당일에 1학년 수업 없음</option> : 
+                                                         availablePeriodsA.map(i => {
+                                                            const t = teachersMaster.find(t => t.name === selectedTeacherA);
+                                                            const className = t ? t.schedule[selectedDayA]?.[i] : '';
+                                                            const isSwapped = swapHistory.some(h => h.semester === selectedSemester && h.teacherA === selectedTeacherA && h.dateA === selectedDateA && h.periodA === i + 1);
+                                                            return <option key={i} value={i}>{i+1}교시 ({className}){isSwapped ? ' - [확정]' : ''}</option>;
+                                                         })
+                                                        }
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* STEP 2: 모든 후보 매칭 결과 */}
+                                    <div className="space-y-3 pt-2">
+                                        <h3 className="text-base font-black text-slate-800 flex items-center gap-2 px-1">
+                                            <Search size={18} className="text-indigo-600" /> 교환 가능한 전체 시간 및 파트너 추천
+                                        </h3>
+                                        
+                                        {!selectedTeacherA ? (
+                                            <div className="bg-white p-12 rounded-2xl border-2 border-dashed border-slate-200 text-center text-slate-400">
+                                                <Search className="mx-auto mb-3 opacity-20" size={40} />
+                                                <p className="font-bold text-sm">결강 정보를 입력하시면 시스템이 모든 조합을 자동 계산합니다.</p>
+                                            </div>
+                                        ) : selectedPeriodA === -1 ? (
+                                            <div className="bg-slate-50 p-10 rounded-2xl border border-slate-200 text-center">
+                                                <AlertCircle size={36} className="mx-auto mb-2 text-slate-300" />
+                                                <p className="text-slate-600 font-black text-base">선택하신 날짜에는 1학년 수업이 없습니다.</p>
+                                            </div>
+                                        ) : existingSwap ? (
+                                            <div className="bg-emerald-50 p-10 rounded-2xl border border-emerald-200 text-center">
+                                                <CheckCircle2 size={36} className="mx-auto mb-2 text-emerald-500" />
+                                                <p className="text-emerald-800 font-black text-lg">이미 교체가 확정된 수업입니다.</p>
+                                                <p className="text-sm text-emerald-700 mt-1 font-bold">교체 파트너: {existingSwap.teacherB} 선생님</p>
+                                                <p className="text-[11px] text-emerald-600 mt-1 font-medium">수정을 원하시면 [교환 내역 조회]에서 해당 기록을 취소해주세요.</p>
+                                            </div>
+                                        ) : currentClassA && swapCandidates.length === 0 ? (
+                                            <div className="bg-orange-50 p-10 rounded-2xl border border-orange-100 text-center">
+                                                <AlertCircle size={36} className="mx-auto mb-2 text-orange-400" />
+                                                <p className="text-orange-700 font-black text-base">상호 교체가 가능한 시간을 찾을 수 없습니다.</p>
+                                                <p className="text-[11px] text-orange-500 mt-1 font-medium">동일 학급 선생님들과의 상호 빈 시간 일정이 전혀 맞지 않습니다.</p>
+                                            </div>
+                                        ) : (
+                                            currentClassA && (
+                                                <div className="grid grid-cols-1 gap-3">
+                                                    {swapCandidates.map((swap, idx) => {
+                                                        // 랭크별 카드 스타일링
+                                                        let rankColor = 'bg-emerald-500';
+                                                        let borderColor = 'hover:border-emerald-400 border-slate-200';
+                                                        let rankLabel = '1순위';
+                                                        
+                                                        if (swap.rank === 2) {
+                                                            rankColor = 'bg-amber-500';
+                                                            borderColor = 'hover:border-amber-400 border-slate-200';
+                                                            rankLabel = '2순위';
+                                                        } else if (swap.rank === 3) {
+                                                            rankColor = 'bg-rose-500';
+                                                            borderColor = 'hover:border-rose-400 border-slate-200';
+                                                            rankLabel = '3순위';
+                                                        }
+
+                                                        const dynamicDateB = getTargetDate(selectedDateA, swap.dayB);
+
+                                                        return (
+                                                            <div key={`${swap.teacherB.name}-${swap.dayB}-${swap.periodB}`} 
+                                                                 className={`bg-white p-4 rounded-2xl shadow-sm border flex flex-col md:flex-row items-center justify-between gap-4 transition-all group ${borderColor} relative overflow-hidden`}>
+                                                                
+                                                                {/* 랭크 라벨 */}
+                                                                <div className={`absolute top-0 right-0 px-3 py-1 font-black text-[10px] rounded-bl-xl tracking-widest text-white shadow-sm ${rankColor} z-10`}>
+                                                                    {rankLabel} 추천
+                                                                </div>
+
+                                                                {/* 교환 정보 요약 블록 */}
+                                                                <div className="flex-1 w-full flex items-center justify-between md:justify-start gap-3 mt-4 md:mt-0">
+                                                                    <div className="bg-slate-50 p-3 rounded-xl text-center min-w-[100px] border border-slate-100 flex flex-col justify-center w-full">
+                                                                        <div className="text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">내가 부탁할 수업</div>
+                                                                        <div className="font-black text-indigo-600">{currentClassA}</div>
+                                                                        <div className="text-[10px] font-bold text-slate-500 mt-0.5">{dayMapKor[selectedDayA]} {selectedPeriodA + 1}교시</div>
+                                                                        {swap.warningB && <div className="mt-1.5 text-[9px] font-black text-orange-600 bg-orange-100 rounded py-0.5 w-full"><AlertCircle size={10} className="inline mr-0.5"/>상대방 3연강</div>}
+                                                                    </div>
+
+                                                                    <ArrowRightLeft className="text-slate-300 mx-1 shrink-0 group-hover:text-indigo-400" size={20} />
+
+                                                                    <div className="bg-indigo-50 p-3 rounded-xl text-center min-w-[100px] border border-indigo-100 flex flex-col justify-center relative overflow-hidden w-full">
+                                                                        {swap.isSameDay === 1 && (
+                                                                            <div className="absolute -top-1 -right-1 w-6 h-6 bg-emerald-100 text-emerald-600 rounded-bl-full flex justify-center items-center">
+                                                                               <Star size={8} className="ml-1.5 mb-1.5 fill-current" />
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="text-[10px] font-black text-indigo-400 mb-1 uppercase tracking-widest">내가 대신할 수업</div>
+                                                                        <div className="font-black text-slate-800">{swap.classB}</div>
+                                                                        <div className="text-[10px] font-bold text-indigo-600 mt-0.5">{dynamicDateB} ({dayMapKor[swap.dayB]}) {swap.periodB + 1}교시</div>
+                                                                        {swap.warningA && <div className="mt-1.5 text-[9px] font-black text-orange-600 bg-orange-100 rounded py-0.5 w-full"><AlertCircle size={10} className="inline mr-0.5"/>내 시간표 3연강</div>}
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* 선생님 정보 및 액션 */}
+                                                                <div className="flex items-center justify-between w-full md:w-auto gap-6 pl-0 md:pl-4 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0">
+                                                                    <div>
+                                                                        <p className="text-[10px] font-bold text-slate-400 mb-0.5">교체 파트너</p>
+                                                                        <div className="flex flex-col gap-1 items-start">
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <span className="font-black text-lg text-slate-800">{swap.teacherB.name}</span>
+                                                                                {swap.isSameDay === 1 && <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">당일 교체</span>}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            setModalSwap({ ...swap, targetDateB: dynamicDateB });
+                                                                        }}
+                                                                        className="px-4 py-2 bg-slate-800 text-white font-bold text-sm rounded-xl shadow-md hover:bg-indigo-600 active:scale-95 transition-all whitespace-nowrap"
+                                                                    >
+                                                                        교체 시 시간표
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'history' && (
+                                <div className="space-y-5 animate-in fade-in duration-500">
+                                    <header className="flex flex-col md:flex-row md:items-end justify-between gap-3">
+                                        <div>
+                                            <h2 className="text-2xl font-black text-slate-800">수업 맞교환 내역</h2>
+                                        </div>
+                                    </header>
+
+                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left whitespace-nowrap">
+                                                <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                                                    <tr>
+                                                        <th className="px-5 py-4">확정 일시</th>
+                                                        <th className="px-5 py-4">결강 및 대강 요청자 (A)</th>
+                                                        <th className="px-5 py-4 text-center">🔄</th>
+                                                        <th className="px-5 py-4">수업을 대신해주는 교사 (B)</th>
+                                                        <th className="px-5 py-4 text-right">관리</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-50 text-sm">
+                                                    {swapHistory.length === 0 ? (
+                                                        <tr><td colSpan="5" className="py-16 text-center text-slate-400 font-bold">진행된 교체 내역이 없습니다.</td></tr>
+                                                    ) : swapHistory.map(h => (
+                                                        <tr key={h.id} className="hover:bg-slate-50/80 transition-colors">
+                                                            <td className="px-5 py-4">
+                                                                <p className="font-bold text-slate-400 text-xs">{h.timestamp}</p>
+                                                            </td>
+                                                            <td className="px-5 py-4">
+                                                                <p className="font-black text-indigo-700">{h.teacherA} 선생님 <span className="text-[10px] bg-indigo-50 px-1.5 py-0.5 rounded text-indigo-500">휴강</span></p>
+                                                                <p className="text-xs font-bold mt-1 text-slate-600">{h.dateA} ({dayMapKor[h.dayA]}) {h.periodA}교시</p>
+                                                                <p className="text-xs text-slate-400 mt-0.5">{h.classA}</p>
+                                                            </td>
+                                                            <td className="px-5 py-4 text-center text-slate-300"><ArrowRightLeft size={16}/></td>
+                                                            <td className="px-5 py-4">
+                                                                <p className="font-black text-slate-700">{h.teacherB} 선생님 <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">대강</span></p>
+                                                                <p className="text-xs font-bold mt-1 text-slate-600">{h.dateB} ({dayMapKor[h.dayB]}) {h.periodB}교시</p>
+                                                                <p className="text-xs text-slate-400 mt-0.5">{h.classB}</p>
+                                                            </td>
+                                                            <td className="px-5 py-4 text-right">
+                                                                <button onClick={() => handleDeleteRecord(h.id)} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors">
+                                                                    <Trash2 size={16} />
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </main>
+                    </div>
+
+                    <footer className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 px-4 py-2 flex justify-around md:hidden z-40 pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+                        {[
+                            { id: 'swap', label: '교환', icon: <ArrowRightLeft size={20}/> },
+                            { id: 'history', label: '내역', icon: <History size={20}/> }
+                        ].map(item => (
+                            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center gap-1 p-1 w-16 transition-all ${activeTab === item.id ? 'text-indigo-600 -translate-y-0.5' : 'text-slate-400 hover:text-slate-600'}`}>
+                                {item.icon}
+                                <span className="text-[10px] font-bold">{item.label}</span>
+                            </button>
+                        ))}
+                    </footer>
+
+                    {/* 교체 확정 모달 */}
+                    {modalSwap && (
+                        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+                            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setModalSwap(null)}></div>
+                            <div className="relative bg-white w-full max-w-2xl rounded-t-[2rem] md:rounded-[2rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8 duration-300 flex flex-col">
+                                <div className="bg-indigo-600 text-white p-6 text-center relative">
+                                    <button onClick={() => setModalSwap(null)} className="absolute right-6 top-6 p-1.5 bg-white/10 hover:bg-white/20 rounded-full transition-colors"><X size={20}/></button>
+                                    <h4 className="text-xl font-black flex items-center justify-center gap-2">
+                                        <CalendarDays size={24}/> {modalSwap.teacherB.name} 선생님 시간표 점검
+                                    </h4>
+                                </div>
+                                <div className="p-6 overflow-y-auto hide-scrollbar space-y-4">
+                                    <div className="bg-white p-4 rounded-xl border border-slate-200 overflow-x-auto">
+                                        <table className="w-full text-[10px] md:text-xs">
+                                            <thead>
+                                                <tr className="text-slate-400 font-bold border-b border-slate-200 uppercase">
+                                                    <th className="py-2 w-12">교시</th>{['mon','tue','wed','thu','fri'].map(d => <th key={d} className="py-2 w-[18%]">{dayMapKor[d]}</th>)}
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {[0,1,2,3,4,5,6].map(pIdx => (
+                                                    <tr key={pIdx}>
+                                                        <td className="py-2 text-center text-slate-400 font-black bg-white">{pIdx+1}</td>
+                                                        {['mon','tue','wed','thu','fri'].map(day => {
+                                                            const isGive = day === modalSwap.dayB && pIdx === modalSwap.periodB; 
+                                                            const isTake = day === selectedDayA && pIdx === selectedPeriodA; 
+                                                            const content = modalSwap.teacherB.schedule[day][pIdx];
+                                                            
+                                                            return (
+                                                                <td key={day} className={`p-1 text-center ${isTake ? 'bg-indigo-50' : isGive ? 'bg-rose-50' : 'bg-white'}`}>
+                                                                    {isTake ? (
+                                                                        <div className="bg-indigo-600 text-white py-1 px-1 rounded-md font-bold shadow-sm relative">
+                                                                            대강<br/><span className="text-[9px] font-medium opacity-90">{currentClassA}</span>
+                                                                        </div>
+                                                                    ) : isGive ? (
+                                                                        <div className="bg-rose-100 text-rose-500 py-1 px-1 rounded-md font-bold line-through opacity-80">{content}</div>
+                                                                    ) : content ? (
+                                                                        <div className="bg-slate-100 text-slate-500 p-1 rounded-lg font-medium truncate max-w-[45px] mx-auto opacity-70">{content}</div>
+                                                                    ) : <span className="text-slate-200">-</span>}
+                                                                </td>
+                                                            );
+                                                        })}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                        <div className="flex items-center gap-4 mt-3 text-[10px] justify-center text-slate-500">
+                                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-indigo-600 inline-block"></span> 내가 들어갈 시간 (파트너 빈 시간)</span>
+                                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-rose-200 inline-block"></span> 파트너가 쉴 시간</span>
+                                        </div>
+                                    </div>
+
+                                    {/* 모달 내 요약 정보 업데이트: 날짜 텍스트로 표시 */}
+                                    <div className="flex flex-col sm:flex-row gap-4 pt-2">
+                                        <div className="flex-1 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                            <div className="bg-indigo-100 text-indigo-700 px-2 py-0.5 text-[10px] font-black rounded uppercase tracking-widest inline-block mb-2">내가 부탁하는 수업 (휴강)</div>
+                                            <p className="font-black text-lg text-slate-800">{currentClassA}</p>
+                                            <p className="text-xs font-bold text-slate-500 mt-1">{selectedDateA} ({dayMapKor[selectedDayA]}요일) {selectedPeriodA + 1}교시</p>
+                                        </div>
+
+                                        <div className="flex-1 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                            <div className="bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[10px] font-black rounded uppercase tracking-widest inline-block mb-2">내가 대신할 수업 (대강)</div>
+                                            <p className="font-black text-lg text-slate-800">{modalSwap.classB}</p>
+                                            <p className="text-xs font-bold text-slate-500 mt-1">{modalSwap.targetDateB} ({dayMapKor[modalSwap.dayB]}요일) {modalSwap.periodB + 1}교시</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-2 pt-2">
+                                        <button onClick={() => setModalSwap(null)} className="flex-1 py-4 bg-slate-100 text-slate-500 font-black rounded-xl hover:bg-slate-200 transition-all text-sm">취소</button>
+                                        <button onClick={handleConfirmSwap} className="flex-[2] py-4 bg-indigo-600 text-white font-black rounded-xl shadow-md hover:bg-indigo-700 transition-all active:scale-95 text-sm">최종 교체 확정</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {toastMsg && (
+                        <div className="fixed bottom-20 md:bottom-8 left-1/2 -translate-x-1/2 z-50 toast-animate">
+                            <div className="bg-slate-800 text-white px-5 py-3 rounded-xl shadow-2xl font-bold flex items-center gap-2 min-w-[260px] justify-center text-sm">
+                                <CheckCircle2 className="text-green-400" size={18} />
+                                {toastMsg}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
