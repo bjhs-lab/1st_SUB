@@ -146,10 +146,7 @@
             
             if (targetIndex === undefined) return "";
             
-            // 날짜 차이 계산
             let diff = targetIndex - dayIndexA;
-            
-            // 결강일 기준 이전 날짜가 나오지 않도록 처리 (가장 가까운 미래의 해당 요일)
             if (diff < 0) {
                 diff += 7; // 과거 요일이면 다음 주로 넘김
             }
@@ -157,7 +154,6 @@
             const dateB = new Date(dateA);
             dateB.setDate(dateA.getDate() + diff);
             
-            // ISO 문자열 반환
             const offset = dateB.getTimezoneOffset() * 60000;
             return (new Date(dateB - offset)).toISOString().split('T')[0];
         };
@@ -328,12 +324,12 @@
                 }
             }, []);
 
-            // 3연강 체크 (내어주는 수업은 제외하고 계산하도록 수정됨)
+            // 3연강 체크 (내어주는 수업은 제외하고 계산)
             const isConsecutive = (teacher, targetDay, targetPeriod, giveUpDay, giveUpPeriod) => {
                 if (targetPeriod === -1) return false;
                 const effectiveSchedule = [...teacher.schedule[targetDay]];
                 
-                // ★ 핵심 수정: 같은 요일의 수업을 교환하는 경우, 내가 내어줄(휴강할) 수업 시간은 비워줍니다.
+                // 같은 요일의 수업을 교환하는 경우, 내가 내어줄(휴강할) 수업 시간은 비워줍니다.
                 if (targetDay === giveUpDay && giveUpPeriod !== -1) {
                     effectiveSchedule[giveUpPeriod] = "";
                 }
@@ -349,7 +345,7 @@
                 return false; 
             };
 
-            // --- STEP 2: 가능한 모든 시간 전수 탐색 및 순위 산출 엔진 ---
+            // --- STEP 2: 전수 조사 및 순위 자동 산출 로직 ---
             const swapCandidates = useMemo(() => {
                 if (!selectedTeacherA || selectedPeriodA === -1 || !selectedDayA || teachersMaster.length === 0) return [];
                 
@@ -368,15 +364,13 @@
                         if (dayB === 'wed' && periodB === 6) continue;
                         if (dayB === 'fri' && (periodB === 5 || periodB === 6)) continue;
                         
-                        // [규칙 2] 동일 요일, 동일 시간은 의미 없음
+                        // [규칙 2] 동일 요일, 동일 시간은 교환 의미 없음
                         if (selectedDayA === dayB && selectedPeriodA === periodB) continue;
 
-                        // [규칙 3] 파트너가 들어갈 내 원래 시간(B)에 나(A)는 반드시 비어있어야 함 (내 빈 시간이어야 함)
-                        // (공강감독 등 어떠한 내용이라도 들어있으면 바쁜 시간으로 취급)
+                        // [규칙 3] 파트너가 들어갈 내 원래 시간(B)에 나(A)는 반드시 비어있어야 함 (내 빈 시간)
                         const classA_at_TimeB = teacherA.schedule[dayB][periodB];
                         if (classA_at_TimeB && classA_at_TimeB !== "-") continue;
 
-                        // 이제 이 시간(dayB, periodB)에 targetRoom(예: 1-1)을 들어가는 선생님(B)을 찾음
                         teachersMaster.forEach(teacherB => {
                             if (teacherB.name === teacherA.name) return; // 본인 제외
 
@@ -386,22 +380,20 @@
                             if (!classB || getRoomNumber(classB) !== targetRoom) return;
 
                             // [규칙 5] 내 결강 시간(A)에 B 선생님은 반드시 비어있어야 함
-                            // (공강감독 등 어떠한 내용이라도 들어있으면 바쁜 시간으로 취급)
                             const classB_at_TimeA = teacherB.schedule[selectedDayA][selectedPeriodA];
                             if (classB_at_TimeA && classB_at_TimeA !== "-") return;
 
-                            // 여기까지 왔다면 상호 빈 시간 조건은 완벽하게 충족됨. 
-                            // 이제 3연강(warning) 발생 여부를 확인하여 순위(Rank) 결정
-                            // warningA: 선생님A가 새로 들어갈 시간(dayB, periodB)에 3연강이 되는가? (기존 수업 selectedDayA, selectedPeriodA 는 내어줌)
+                            // 여기까지 상호 빈 시간 조건 충족. 3연강(warning) 발생 여부 확인
                             const warningA = isConsecutive(teacherA, dayB, periodB, selectedDayA, selectedPeriodA);
-                            // warningB: 선생님B가 새로 들어갈 시간(selectedDayA, selectedPeriodA)에 3연강이 되는가? (기존 수업 dayB, periodB 는 내어줌)
                             const warningB = isConsecutive(teacherB, selectedDayA, selectedPeriodA, dayB, periodB);
 
                             let rank = 1;
-                            if (warningA && warningB) {
+                            if (!warningA && !warningB) {
+                                rank = 1; // 둘 다 연강 아님
+                            } else if (warningA && warningB) {
                                 rank = 3; // 둘 다 3연강
-                            } else if (warningA || warningB) {
-                                rank = 2; // 어느 한쪽만 3연강
+                            } else {
+                                rank = 2; // 어느 한 쪽만 3연강
                             }
 
                             candidates.push({
@@ -418,7 +410,7 @@
                     }
                 });
 
-                // 정렬 로직: 1. 순위 오름차순 (1순위가 먼저) -> 2. 당일 교체 우선 -> 3. 이름순
+                // 정렬: 1순위 먼저 -> 당일 교체 우선 -> 이름순
                 return candidates.sort((a, b) => 
                     a.rank - b.rank || 
                     b.isSameDay - a.isSameDay || 
@@ -570,7 +562,7 @@
                                     {/* STEP 2: 모든 후보 매칭 결과 */}
                                     <div className="space-y-3 pt-2">
                                         <h3 className="text-base font-black text-slate-800 flex items-center gap-2 px-1">
-                                            <Search size={18} className="text-indigo-600" /> 교환 가능한 전체 시간 및 파트너 추천
+                                            <Search size={18} className="text-indigo-600" /> 상호 교체 가능한 파트너 및 시간 추천
                                         </h3>
                                         
                                         {!selectedTeacherA ? (
@@ -599,7 +591,7 @@
                                         ) : (
                                             currentClassA && (
                                                 <div className="grid grid-cols-1 gap-3">
-                                                    {swapCandidates.map((swap, idx) => {
+                                                    {swapCandidates.map((swap) => {
                                                         // 랭크별 카드 스타일링
                                                         let rankColor = 'bg-emerald-500';
                                                         let borderColor = 'hover:border-emerald-400 border-slate-200';
@@ -632,7 +624,7 @@
                                                                         <div className="text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">내가 부탁할 수업</div>
                                                                         <div className="font-black text-indigo-600">{currentClassA}</div>
                                                                         <div className="text-[10px] font-bold text-slate-500 mt-0.5">{dayMapKor[selectedDayA]} {selectedPeriodA + 1}교시</div>
-                                                                        {swap.warningB && <div className="mt-1.5 text-[9px] font-black text-orange-600 bg-orange-100 rounded py-0.5 w-full"><AlertCircle size={10} className="inline mr-0.5"/>상대방 3연강</div>}
+                                                                        {swap.warningB && <div className="mt-1.5 text-[9px] font-black text-orange-600 bg-orange-100 rounded py-0.5 w-full"><AlertCircle size={10} className="inline mr-0.5"/>파트너 3연강</div>}
                                                                     </div>
 
                                                                     <ArrowRightLeft className="text-slate-300 mx-1 shrink-0 group-hover:text-indigo-400" size={20} />
