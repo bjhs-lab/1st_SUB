@@ -35,7 +35,7 @@
         // [데이터 설정 영역] 2026학년도 2학기 데이터 반영
         // ============================================================================
         
-        const RAW_DEPT_CSV = `과학,안준범\n과학,최정곤\n과학,아원미\n과학,이지은\n과학,장영화\n과학,허영\n교양,안은수\n교양,임성숙\n교양,구정훈\n교양,추재훈\n교양,이소진\n국어,김용진\n국어,박두일\n국어,송병훈\n국어,김현정\n국어,김미영\n국어,이명진\n사회,권민지\n사회,유지연\n사회,김지수\n사회,최미리\n사회,강슬기\n사회,노우선\n사회,김성년\n수학,김병희\n수학,남송현\n수학,박태완\n수학,옥수민\n수학,고재덕\n수학,유지혜\n영어,이광욱\n영어,김혜미\n영어,이정인\n영어,박은정\n영어,고경미\n영어,정미영\n예술,신선경\n예술,신은경\n예술,유경희\n예술,류제원\n예술,이동규\n예술,김창훈\n예술,음악시간강사\n체육,주원석\n수학,최정은\n예술,김도훈`;
+        const RAW_DEPT_CSV = `과학,안준범\n과학,최정곤\n과학,아원미\n과학,이지은\n과학,장영화\n과학,허영\n교양,안은수\n교양,임성숙\n교양,구정훈\n교양,추재훈\n교양,이소진\n국어,김용진\n국어,박두일\n국어,송병훈\n국어,김현정\n국어,최승희\n국어,이명진\n사회,권민지\n사회,유지연\n사회,김지수\n사회,최미리\n사회,강슬기\n사회,노우선\n사회,김성년\n수학,김병희\n수학,남송현\n수학,박태완\n수학,옥수민\n수학,고재덕\n수학,유지혜\n영어,이광욱\n영어,김혜미\n영어,이정인\n영어,박은정\n영어,고경미\n영어,정미영\n예술,신선경\n예술,신은경\n예술,유경희\n예술,류제원\n예술,이동규\n예술,김창훈\n예술,음악시간강사\n체육,체육시간강사\n수학,수학시간강사\n과학,김도훈`;
 
         const RAW_TIME_CSV = `2026학년도 2학기 전체시간표,,,,,,,,,,,,,,,,,,,,,
 ,,,,,,,,,,,,,,,,,,,,배정고등학교,
@@ -598,6 +598,7 @@
                                             currentClassA && (
                                                 <div className="grid grid-cols-1 gap-3">
                                                     {swapCandidates.map((swap, idx) => {
+                                                        // 랭크별 카드 스타일링
                                                         let rankColor = 'bg-emerald-500';
                                                         let borderColor = 'hover:border-emerald-400 border-slate-200';
                                                         let rankLabel = '1순위';
@@ -616,53 +617,70 @@
 
                                                         return (
                                                             <div key={`${swap.teacherB.name}-${swap.dayB}-${swap.periodB}`} 
-                                                                 className={`bg-white p-4 rounded-2xl shadow-sm border flex flex-col md:flex-row items-center justify-between gap-4 transition-all group ${borderColor} relative overflow-hidden`}>
+                                                                 className={`bg-white p-4 rounded-2xl shadow-sm border transition-all group ${borderColor} relative overflow-hidden`}>
                                                                 
+                                                                {/* 랭크 라벨 */}
                                                                 <div className={`absolute top-0 right-0 px-3 py-1 font-black text-[10px] rounded-bl-xl tracking-widest text-white shadow-sm ${rankColor} z-10`}>
                                                                     {rankLabel} 추천
                                                                 </div>
 
-                                                                <div className="flex-1 w-full flex items-center justify-between md:justify-start gap-3 mt-4 md:mt-0">
-                                                                    <div className="bg-slate-50 p-3 rounded-xl text-center min-w-[100px] border border-slate-100 flex flex-col justify-center w-full">
-                                                                        <div className="text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">내가 부탁할 수업</div>
-                                                                        <div className="font-black text-indigo-600">{currentClassA}</div>
-                                                                        <div className="text-[10px] font-bold text-slate-500 mt-0.5">{dayMapKor[selectedDayA]} {selectedPeriodA + 1}교시</div>
-                                                                        {swap.warningB && <div className="mt-1.5 text-[9px] font-black text-orange-600 bg-orange-100 rounded py-0.5 w-full"><AlertCircle size={10} className="inline mr-0.5"/>상대방 3연강</div>}
-                                                                    </div>
+                                                                {/* Grid Layout 적용으로 과목명 길이에 상관없이 완벽하게 일관된 열 크기 유지 */}
+                                                                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center w-full mt-3 md:mt-0">
+                                                                    
+                                                                    {/* 교환 정보 요약 블록 (7칸 할당) */}
+                                                                    <div className="col-span-1 md:col-span-7 flex items-center justify-between gap-2 md:gap-4">
+                                                                        {/* 고정 높이(h-[112px])를 부여하여 모든 카드의 높이를 똑같이 맞추고, Flex-center로 내용물을 항상 수직 중앙 정렬합니다. */}
+                                                                        <div className="flex-1 bg-slate-50 p-3 rounded-xl text-center border border-slate-100 flex flex-col justify-center h-[112px] min-w-0">
+                                                                            <div className="text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest truncate">내가 부탁할 수업</div>
+                                                                            <div className="font-black text-indigo-600 truncate">{currentClassA}</div>
+                                                                            <div className="text-[10px] font-bold text-slate-500 mt-0.5 truncate">{dayMapKor[selectedDayA]} {selectedPeriodA + 1}교시</div>
+                                                                            {swap.warningB && (
+                                                                                <div className="mt-1.5 text-[9px] font-black text-orange-600 bg-orange-100 rounded py-0.5 w-full truncate">
+                                                                                    <AlertCircle size={10} className="inline mr-0.5"/>상대방 3연강
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
 
-                                                                    <ArrowRightLeft className="text-slate-300 mx-1 shrink-0 group-hover:text-indigo-400" size={20} />
+                                                                        <ArrowRightLeft className="text-slate-300 shrink-0" size={20} />
 
-                                                                    <div className="bg-indigo-50 p-3 rounded-xl text-center min-w-[100px] border border-indigo-100 flex flex-col justify-center relative overflow-hidden w-full">
-                                                                        {swap.isSameDay === 1 && (
-                                                                            <div className="absolute -top-1 -right-1 w-6 h-6 bg-emerald-100 text-emerald-600 rounded-bl-full flex justify-center items-center">
-                                                                               <Star size={8} className="ml-1.5 mb-1.5 fill-current" />
-                                                                            </div>
-                                                                        )}
-                                                                        <div className="text-[10px] font-black text-indigo-400 mb-1 uppercase tracking-widest">내가 대신할 수업</div>
-                                                                        <div className="font-black text-slate-800">{swap.classB}</div>
-                                                                        <div className="text-[10px] font-bold text-indigo-600 mt-0.5">{dynamicDateB} ({dayMapKor[swap.dayB]}) {swap.periodB + 1}교시</div>
-                                                                        {swap.warningA && <div className="mt-1.5 text-[9px] font-black text-orange-600 bg-orange-100 rounded py-0.5 w-full"><AlertCircle size={10} className="inline mr-0.5"/>내 시간표 3연강</div>}
-                                                                    </div>
-                                                                </div>
-
-                                                                <div className="flex items-center justify-between w-full md:w-auto gap-6 pl-0 md:pl-4 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0">
-                                                                    <div>
-                                                                        <p className="text-[10px] font-bold text-slate-400 mb-0.5">교체 파트너</p>
-                                                                        <div className="flex flex-col gap-1 items-start">
-                                                                            <div className="flex items-center gap-1.5">
-                                                                                <span className="font-black text-lg text-slate-800">{swap.teacherB.name}</span>
-                                                                                {swap.isSameDay === 1 && <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">당일 교체</span>}
-                                                                            </div>
+                                                                        {/* 고정 높이(h-[112px])를 부여하여 모든 카드의 높이를 똑같이 맞추고, Flex-center로 내용물을 항상 수직 중앙 정렬합니다. */}
+                                                                        <div className="flex-1 bg-indigo-50 p-3 rounded-xl text-center border border-indigo-100 relative overflow-hidden flex flex-col justify-center h-[112px] min-w-0">
+                                                                            {swap.isSameDay === 1 && (
+                                                                                <div className="absolute -top-1 -right-1 w-6 h-6 bg-emerald-100 text-emerald-600 rounded-bl-full flex justify-center items-center">
+                                                                                   <Star size={8} className="ml-1.5 mb-1.5 fill-current" />
+                                                                                </div>
+                                                                            )}
+                                                                            <div className="text-[10px] font-black text-indigo-400 mb-1 uppercase tracking-widest truncate">내가 대신할 수업</div>
+                                                                            <div className="font-black text-slate-800 truncate">{swap.classB}</div>
+                                                                            <div className="text-[10px] font-bold text-indigo-600 mt-0.5 truncate">{dynamicDateB} ({dayMapKor[swap.dayB]}) {swap.periodB + 1}교시</div>
+                                                                            {swap.warningA && (
+                                                                                <div className="mt-1.5 text-[9px] font-black text-orange-600 bg-orange-100 rounded py-0.5 w-full truncate">
+                                                                                    <AlertCircle size={10} className="inline mr-0.5"/>내 시간표 3연강
+                                                                                </div>
+                                                                            )}
                                                                         </div>
                                                                     </div>
-                                                                    <button 
-                                                                        onClick={() => {
-                                                                            setModalSwap({ ...swap, targetDateB: dynamicDateB });
-                                                                        }}
-                                                                        className="px-4 py-2 bg-slate-800 text-white font-bold text-sm rounded-xl shadow-md hover:bg-indigo-600 active:scale-95 transition-all whitespace-nowrap"
-                                                                    >
-                                                                        교체 시 시간표
-                                                                    </button>
+
+                                                                    {/* 선생님 정보 및 액션 (5칸 할당) */}
+                                                                    <div className="col-span-1 md:col-span-5 flex items-center justify-between gap-4 md:pl-4 md:border-l border-slate-100 pt-3 md:pt-0 border-t md:border-t-0 h-full">
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <p className="text-[10px] font-bold text-slate-400 mb-0.5 truncate">교체 파트너</p>
+                                                                            <div className="flex flex-col gap-1 items-start">
+                                                                                <div className="flex items-center gap-1.5">
+                                                                                    <span className="font-black text-lg text-slate-800 whitespace-nowrap">{swap.teacherB.name}</span>
+                                                                                    {swap.isSameDay === 1 && <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">당일 교체</span>}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <button 
+                                                                            onClick={() => {
+                                                                                setModalSwap({ ...swap, targetDateB: dynamicDateB });
+                                                                            }}
+                                                                            className="px-4 py-2 bg-slate-800 text-white font-bold text-sm rounded-xl shadow-md hover:bg-indigo-600 active:scale-95 transition-all whitespace-nowrap shrink-0"
+                                                                        >
+                                                                            교체 시 시간표
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         );
